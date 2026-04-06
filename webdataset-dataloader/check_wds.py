@@ -10,7 +10,7 @@ sys.path.append(src_dir)
 
 from aidall_seg.data.imagenet_wds import ImageNetWDSDataModule
 
-NUM_BATCHES = 50  # 처리량 측정에 사용할 배치 수
+NUM_BATCHES = 300  # 처리량 측정에 사용할 배치 수
 
 
 def test_pipeline():
@@ -39,15 +39,14 @@ def test_pipeline():
     sustained_start = None
     sustained_images = 0
     overall_start = time.perf_counter()
-    batch_throughputs = []  # 배치별 처리량 기록
-    batch_start = None
+    cumulative_throughputs = []  # 누적 평균 처리량 기록
 
     for i, (images, labels) in enumerate(train_loader): #for문이 시작될때 가져오기 시작함
         elapsed = time.perf_counter() - overall_start
 
         if i == 0:
             first_batch_time = elapsed
-            print(f"\n[첫 번째 배치] 수신 완료 ({first_batch_time:.2f}초, 버퍼 채움 대기 포함)")
+            print(f"\n[첫 번째 배치] 수신 완료 ({first_batch_time:.2f}초, 버퍼 채움 대기 포함) / {images.shape[0]}장")
             print(f"이미지 텐서 형태 (B, C, H, W) : {images.shape}")
             print(f"정답 라벨 형태 (B)           : {labels.shape}")
             print(f"이미지 데이터 타입           : {images.dtype}")
@@ -55,12 +54,10 @@ def test_pipeline():
             print(f"첫 5개 이미지의 정답 라벨    : {labels[:5].tolist()}")
             print(f"\n[처리량 측정] 2번째 배치부터 {NUM_BATCHES}배치까지 측정...")
             sustained_start = time.perf_counter()
-            batch_start = time.perf_counter()
         else:
-            batch_elapsed = time.perf_counter() - batch_start
-            batch_throughputs.append(images.shape[0] / batch_elapsed)
             sustained_images += images.shape[0]
-            batch_start = time.perf_counter()
+            elapsed_so_far = time.perf_counter() - sustained_start
+            cumulative_throughputs.append(sustained_images / elapsed_so_far)
 
         if i + 1 >= NUM_BATCHES:
             break
@@ -82,8 +79,8 @@ def test_pipeline():
     save_path = os.path.join(project_root, "throughput.png")
     fig, ax = plt.subplots(figsize=(10, 4))
     x = range(2, NUM_BATCHES + 1)
-    ax.plot(x, batch_throughputs, color="steelblue", linewidth=1, alpha=0.6, label="per-batch throughput")
-    ax.axhline(throughput, color="tomato", linewidth=1.5, linestyle="--", label=f"avg {throughput:.1f} img/s")
+    ax.plot(x, cumulative_throughputs, color="steelblue", linewidth=1.5, label="cumulative avg throughput")
+    ax.axhline(throughput, color="tomato", linewidth=1.5, linestyle="--", label=f"final avg {throughput:.1f} img/s")
     ax.set_xlabel("Batch")
     ax.set_ylabel("Throughput (img/s)")
     ax.set_title("S3 Streaming Throughput (WebDataset)")
