@@ -79,7 +79,9 @@ def test_pipeline():
     save_path = os.path.join(project_root, "throughput.png")
     fig, ax = plt.subplots(figsize=(10, 4))
     x = range(2, NUM_BATCHES + 1)
-    ax.plot(x, cumulative_throughputs, color="steelblue", linewidth=1.5, label="cumulative avg throughput")
+    # 초반 prefetch 스파이크를 제외하고 플롯 (워커 수만큼 건너뜀)
+    warmup = datamodule.train_num_workers + 1
+    ax.plot(list(x)[warmup:], cumulative_throughputs[warmup:], color="steelblue", linewidth=1.5, label="cumulative avg throughput")
     ax.axhline(throughput, color="tomato", linewidth=1.5, linestyle="--", label=f"final avg {throughput:.1f} img/s")
     ax.set_xlabel("Batch")
     ax.set_ylabel("Throughput (img/s)")
